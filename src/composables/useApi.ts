@@ -32,17 +32,10 @@ interface ChildProcess {
 
 type KsuSpawn = (command: string, args?: string[], options?: SpawnOptions) => ChildProcess;
 
-interface UpdateInfo {
-  current_version: string;
-  latest_version: string;
-  update_url: string;
-  checksum: string;
-  has_update: boolean;
-  update_name: string;
-  update_size: number;
-  published_at: string;
-  notes: string;
-  revision: number;
+interface UpdateInfoRes {
+  updated: boolean;
+  old_generated_at: number;
+  new_generated_at: number;
 }
 
 export type UpdateEvent =
@@ -118,21 +111,11 @@ export function useAPI() {
   };
 
   const loadConfig = async (): Promise<Config> => {
-    const stdout = await execOrThrow(`${PATHS.CIP_BIN} config get --config ${PATHS.CONFIG} --json`);
+    const stdout = await execOrThrow(`${PATHS.CIP_BIN} config get --json`);
     return JSON.parse(stdout);
   };
 
-  const setChannel = async (channel: string) => {
-    await execOrThrow(`${PATHS.CIP_BIN} config set --config ${PATHS.CONFIG} --channel ${channel}`);
-  };
-
-  const setIconsVersion = async (version: string) => {
-    await execOrThrow(
-      `${PATHS.CIP_BIN} config set --config ${PATHS.CONFIG} --icons-version ${version}`,
-    );
-  };
-
-  const getPackagesCount = async (): Promise<number> => {
+  const getAdaptedCount = async (): Promise<number> => {
     const stdout = await execOrThrow(
       `find ${PATHS.TARGET_DIR} -mindepth 1 -maxdepth 1 -type d | wc -l`,
     );
@@ -141,8 +124,15 @@ export function useAPI() {
     return Number.isNaN(num) ? 0 : num;
   };
 
-  const checkUpdate = async (): Promise<UpdateInfo> => {
-    const stdout = await execOrThrow(`${PATHS.CIP_BIN} check --config ${PATHS.CONFIG} --json`);
+  const getPackagesCount = async (): Promise<number> => {
+    const stdout = await execOrThrow(`pm list packages -3 | wc -l`);
+
+    const num = parseInt(stdout, 10);
+    return Number.isNaN(num) ? 0 : num;
+  };
+
+  const checkUpdate = async (): Promise<UpdateInfoRes> => {
+    const stdout = await execOrThrow(`${PATHS.CIP_BIN} check --json`);
     return JSON.parse(stdout);
   };
 
@@ -154,15 +144,11 @@ export function useAPI() {
     const spawn = await ensureSpawn();
 
     return new Promise((resolve, reject) => {
-      const child = spawn(PATHS.CIP_BIN, ["update", "--config", PATHS.CONFIG, "--json"]);
+      const child = spawn(PATHS.CIP_BIN, ["upgrade", "--json"]);
 
-      let newVersion: string | null = null;
       let buffer = "";
 
       const handleParsed = (parsed: any) => {
-        if (parsed?.type === "info" && parsed?.value === "version") {
-          newVersion = parsed.version;
-        }
         onEvent(parsed);
       };
 
@@ -244,12 +230,6 @@ export function useAPI() {
 
         onEvent({ type: "done" });
 
-        try {
-          const version = newVersion ?? (await checkUpdate()).latest_version;
-
-          await setIconsVersion(version);
-        } catch {}
-
         onDone?.();
         resolve();
       };
@@ -270,8 +250,8 @@ export function useAPI() {
 
   return {
     loadConfig,
-    setChannel,
     checkUpdate,
+    getAdaptedCount,
     getPackagesCount,
     updateStream,
   };

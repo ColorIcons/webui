@@ -1,19 +1,14 @@
 export interface Config {
-  default: {
-    icons_version: string;
-    channel: "stable" | "beta";
-    runtime_dir: string;
-    temp_dir: string;
-    target_dir: string;
+  icons: {
+    light: boolean;
+    dark: boolean;
+    mat: boolean;
+    monochrome: boolean;
   };
-  source: {
-    beta: Source;
-    stable: Source;
+  network: {
+    concurrency: number;
   };
-}
-
-export type Channel = "stable" | "beta";
-
-export interface Source {
-  url: string;
+  repo: {
+    base_url: string;
+  };
 }

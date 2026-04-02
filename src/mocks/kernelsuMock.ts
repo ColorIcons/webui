@@ -3,32 +3,24 @@ import type { Config } from "../types/config";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const mockConfig: Config = {
-  default: {
-    icons_version: "1.0.0",
-    channel: "stable",
-    runtime_dir: "",
-    temp_dir: "",
-    target_dir: "",
+  icons: {
+    light: false,
+    dark: false,
+    mat: false,
+    monochrome: false,
   },
-  source: {
-    beta: {
-      url: "",
-    },
-    stable: {
-      url: "",
-    },
+  network: {
+    concurrency: 0,
+  },
+  repo: {
+    base_url: "",
   },
 };
 
 const mockUpdate = {
-  current_version: "1.0.0",
-  latest_version: "1.2.0",
-  has_update: true,
-  update_name: "icons_v1.2.0.zip",
-  update_size: 12 * 1024 * 1024,
-  published_at: new Date().toISOString(),
-  notes: "Mock 更新",
-  revision: 1,
+  updated: true,
+  old_generated_at: 1775130396,
+  new_generated_at: 1775130400,
 };
 
 export const mockExec = async (cmd: string) => {
@@ -42,6 +34,10 @@ export const mockExec = async (cmd: string) => {
     return { errno: 0, stdout: JSON.stringify(mockUpdate), stderr: "" };
   }
 
+  if (cmd.includes("pm")) {
+    return { errno: 0, stdout: "1", stderr: "" };
+  }
+
   return { errno: 0, stdout: "", stderr: "" };
 };
 
@@ -50,78 +46,142 @@ export const mockSpawn = () => {
   let stderrCb: any;
   let exitCb: any;
 
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
   (async () => {
-    const emit = (o: any) => {
+    const emit = async (o: any, delay = 80) => {
+      await sleep(delay);
       stdoutCb?.(JSON.stringify(o) + "\n");
     };
 
-    /* ---------- fetch ---------- */
-    emit({
-      type: "stage",
-      value: "fetch",
-      message:
-        "Fetching index: https://immortal521.github.io/coloros-icons-patch/stable/index.json",
-    });
+    /* ---------- sequence ---------- */
+    const events = [
+      { message: "Fetching index.json", type: "stage", value: "fetch" },
+      { message: "Index version: 1", type: "info", value: "version" },
+      { file: "icons-pebble", type: "stage", value: "download_global" },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/global/icons-pebble",
+        value: "download",
+      },
+      { file: "icons-monorectangle", type: "stage", value: "download_global" },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/global/icons-monorectangle",
+        value: "download",
+      },
+      { file: "icons-rectangle", type: "stage", value: "download_global" },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/global/icons-rectangle",
+        value: "download",
+      },
+      { file: "icons-daylight", type: "stage", value: "download_global" },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/global/icons-daylight",
+        value: "download",
+      },
+      { file: "icons-nightshadow", type: "stage", value: "download_global" },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/global/icons-nightshadow",
+        value: "download",
+      },
+      { file: "icons-darkrectangle", type: "stage", value: "download_global" },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/global/icons-darkrectangle",
+        value: "download",
+      },
+      { file: "icons-meterial", type: "stage", value: "download_global" },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/global/icons-meterial",
+        value: "download",
+      },
+      {
+        file: "monochrome.png",
+        package: "cn.com.bmac.nfc",
+        type: "stage",
+        value: "download_package",
+      },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/packages/cn.com.bmac.nfc/monochrome.png",
+        value: "download",
+      },
+      {
+        file: "monochrome.png",
+        package: "cn.com.langeasy.LangEasyLexis",
+        type: "stage",
+        value: "download_package",
+      },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/packages/cn.com.langeasy.LangEasyLexis/monochrome.png",
+        value: "download",
+      },
+      {
+        file: "monochrome.png",
+        package: "cn.com.chsi.chsiapp",
+        type: "stage",
+        value: "download_package",
+      },
+      {
+        type: "stage",
+        url: "https://coloricons.github.io/icons/packages/cn.com.chsi.chsiapp/monochrome.png",
+        value: "download",
+      },
+      { message: "Downloaded: /data/adb/ColorOSIconsPatch/runtime/icons-pebble", type: "info" },
+      { type: "progress", value: 0.1 },
+      {
+        message: "Downloaded: /data/adb/ColorOSIconsPatch/runtime/icons-monorectangle",
+        type: "info",
+      },
+      { type: "progress", value: 0.2 },
+      { message: "Downloaded: /data/adb/ColorOSIconsPatch/runtime/icons-rectangle", type: "info" },
+      { type: "progress", value: 0.3 },
+      { message: "Downloaded: /data/adb/ColorOSIconsPatch/runtime/icons-daylight", type: "info" },
+      { type: "progress", value: 0.4 },
+      {
+        message: "Downloaded: /data/adb/ColorOSIconsPatch/runtime/icons-nightshadow",
+        type: "info",
+      },
+      { type: "progress", value: 0.5 },
+      { message: "Downloaded: /data/adb/ColorOSIconsPatch/runtime/icons-meterial", type: "info" },
+      { type: "progress", value: 0.6 },
+      {
+        message:
+          "Downloaded: /data/adb/ColorOSIconsPatch/runtime/cn.com.langeasy.LangEasyLexis/monochrome.png",
+        type: "info",
+      },
+      { type: "progress", value: 0.7 },
+      {
+        message: "Downloaded: /data/adb/ColorOSIconsPatch/runtime/icons-darkrectangle",
+        type: "info",
+      },
+      { type: "progress", value: 0.8 },
+      {
+        message:
+          "Downloaded: /data/adb/ColorOSIconsPatch/runtime/cn.com.chsi.chsiapp/monochrome.png",
+        type: "info",
+      },
+      { type: "progress", value: 0.9 },
+      {
+        message: "Downloaded: /data/adb/ColorOSIconsPatch/runtime/cn.com.bmac.nfc/monochrome.png",
+        type: "info",
+      },
+      { type: "progress", value: 1.0 },
+      { message: "index.json updated", type: "info" },
+      { message: "Cleaned temporary files", type: "info" },
+      { message: "Upgrade complete", type: "done" },
+    ];
 
-    await sleep(400);
-
-    emit({
-      type: "info",
-      value: "version",
-      version: "2026.3.21",
-      message: "Latest version: 2026.3.21",
-    });
-
-    /* ---------- download ---------- */
-    emit({ type: "stage", value: "download" });
-
-    for (let i = 0; i <= 100; i += 2) {
-      await sleep(60);
-      emit({
-        type: "progress",
-        stage: "download",
-        value: i,
-      });
+    for (const e of events) {
+      await emit(e);
+      await sleep(1000);
     }
-
-    /* ---------- verify ---------- */
-    emit({
-      type: "stage",
-      value: "verify",
-      message: "Verifying SHA256",
-    });
-
-    await sleep(500);
-
-    emit({
-      type: "info",
-      value: "verify_ok",
-      message: "SHA256 OK",
-    });
-
-    /* ---------- extract ---------- */
-    emit({ type: "stage", value: "extract" });
-
-    const total = 30; // 模拟30个文件
-
-    for (let i = 0; i <= total; i++) {
-      await sleep(50);
-
-      emit({
-        type: "progress",
-        stage: "extract",
-        value: Math.floor((i / total) * 100),
-        file: `com.example.app${i}/icon.png`,
-      });
-    }
-
-    /* ---------- done ---------- */
-    emit({
-      type: "done",
-      target: "/data/adb/modules/ColorOSIconsPatch/uxicons",
-    });
-
-    await sleep(200);
 
     exitCb?.(0);
   })();
@@ -135,7 +195,6 @@ export const mockSpawn = () => {
     stderr: {
       on(event: "data", cb: any) {
         if (event === "data") stderrCb = cb;
-        console.log(stderrCb);
       },
     },
     on(event: string, cb: any) {

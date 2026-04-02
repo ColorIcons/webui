@@ -12,16 +12,9 @@ import { useI18n } from "../composables/useI18n";
 const { t } = useI18n();
 
 interface UpdateInfo {
-  current_version: string;
-  latest_version: string;
-  update_url: string;
-  checksum: string;
-  has_update: boolean;
-  update_name: string;
-  update_size: number;
-  published_at: string;
-  notes: string;
-  revision: number;
+  updated: boolean;
+  old_version: string;
+  new_version: string;
 }
 
 const api = useAPI();
@@ -30,7 +23,8 @@ const loading = ref(true);
 const checking = ref(true);
 const update = ref<UpdateInfo | null>(null);
 
-const iconCount = ref<number | null>(null);
+const packageCount = ref<number | null>(null);
+const adaptedCount = ref<number | null>(null);
 
 const updating = ref(false);
 const progress = ref(0);
@@ -38,52 +32,36 @@ const stage = ref(t("update.fetch"));
 
 const currentStage = ref<string>("fetch");
 
-const STAGE_WEIGHT: Record<string, { start: number; span: number }> = {
-  fetch: { start: 0, span: 5 },
-  download: { start: 5, span: 60 },
-  verify: { start: 65, span: 5 },
-  extract: { start: 70, span: 30 },
-};
-
 const STAGE_LABEL: Record<string, string> = {
   fetch: t("update.fetch"),
+  download_global: t("update.download"),
+  download_package: t("update.download"),
   download: t("update.download"),
-  verify: t("update.verify"),
-  extract: t("update.extract"),
 };
 
 onMounted(async () => {
   try {
-    const [updateRes, count] = await Promise.all([
+    const [updateRes, pc, ac] = await Promise.all([
       api.checkUpdate().catch(() => null),
       api.getPackagesCount?.().catch(() => null),
+      api.getAdaptedCount?.().catch(() => null),
     ]);
 
-    if (updateRes) update.value = updateRes;
-    if (typeof count === "number") iconCount.value = count;
+    if (updateRes)
+      update.value = {
+        updated: updateRes.updated,
+        old_version: formatDate(updateRes.old_generated_at * 1000),
+        new_version: formatDate(updateRes.new_generated_at * 1000),
+      };
+    if (typeof pc === "number") packageCount.value = pc;
+    if (typeof ac === "number") adaptedCount.value = ac;
   } finally {
     loading.value = false;
     checking.value = false;
   }
 });
 
-const formatDate = (iso: string) => new Date(iso).toLocaleString();
-
-const formatSize = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-};
-
-const updateProgress = (stageName: string, value: number) => {
-  const s = STAGE_WEIGHT[stageName];
-  if (!s) return;
-
-  const p = Math.min(value, 100);
-  const global = Math.floor(s.start + (p / 100) * s.span);
-
-  progress.value = Math.max(progress.value, Math.min(global, 99));
-};
+const formatDate = (iso: number) => new Date(iso).toLocaleString();
 
 const handleUpdate = async () => {
   updating.value = true;
@@ -105,13 +83,11 @@ const handleUpdate = async () => {
         }
 
         case "progress": {
-          const stageName = (msg.stage as string) || currentStage.value;
+          const v = msg.value as number;
 
-          if (!stage.value || stage.value === "准备中") {
-            stage.value = STAGE_LABEL[stageName] ?? stageName;
-          }
+          const percent = v <= 1 ? v * 100 : v;
 
-          updateProgress(stageName, msg.value as number);
+          progress.value = Math.max(progress.value, Math.floor(percent));
           break;
         }
 
@@ -129,11 +105,6 @@ const handleUpdate = async () => {
           break;
       }
     });
-
-    const [info, count] = await Promise.all([api.checkUpdate(), api.getPackagesCount?.()]);
-
-    update.value = info;
-    iconCount.value = count;
   } catch (e) {
     console.error("更新失败:", e);
   } finally {
@@ -148,7 +119,13 @@ const handleUpdate = async () => {
       <div class="packages-count-card">
         <span>{{ t("label.packagesCount") }}</span>
 
-        <span v-if="iconCount !== null">{{ iconCount }}</span>
+        <span v-if="packageCount !== null" class="value">{{ packageCount }}</span>
+        <span v-else>{{ t("common.calculating") }}</span>
+      </div>
+      <div class="packages-count-card">
+        <span>{{ t("label.adaptedCount") }}</span>
+
+        <span v-if="packageCount !== null" class="value">{{ adaptedCount }}</span>
         <span v-else>{{ t("common.calculating") }}</span>
       </div>
     </div>
@@ -159,25 +136,17 @@ const handleUpdate = async () => {
         <md-circular-progress indeterminate style="margin-left: auto" />
       </div>
 
-      <template v-else-if="update?.has_update">
+      <template v-else-if="update?.updated">
         <h2 class="title">{{ t("update.found") }}</h2>
 
         <div class="info">
           <div class="row">
             <span>{{ t("update.currentVersion") }}</span>
-            <span>{{ update.current_version }}</span>
+            <span>{{ update.new_version }}</span>
           </div>
           <div class="row">
             <span>{{ t("update.latestVersion") }}</span>
-            <span class="highlight">{{ update.latest_version }}</span>
-          </div>
-          <div class="row">
-            <span>{{ t("update.publishedAt") }}</span>
-            <span>{{ formatDate(update.published_at) }}</span>
-          </div>
-          <div class="row">
-            <span>{{ t("update.size") }}</span>
-            <span>{{ formatSize(update.update_size) }}</span>
+            <span class="highlight">{{ update.old_version }}</span>
           </div>
         </div>
 
@@ -187,10 +156,6 @@ const handleUpdate = async () => {
           <md-linear-progress :value="progress / 100" />
 
           <div class="percent">{{ progress }}%</div>
-        </div>
-
-        <div v-if="update.notes" class="notes">
-          {{ update.notes }}
         </div>
 
         <md-filled-button :disabled="updating" @click="handleUpdate" class="update-btn">
@@ -231,19 +196,27 @@ const handleUpdate = async () => {
 
 .info {
   display: flex;
-  flex-direction: column;
   gap: 8px;
 }
 
 .packages-count-card {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: space-evenly;
   font-size: 14px;
+  color: var(--md-sys-color-on-surface-variant);
   width: 100%;
   margin-bottom: 10px;
   padding: 20px;
   background: var(--md-sys-color-surface-container);
   border-radius: 16px;
+}
+
+.packages-count-card .value {
+  font-size: 20px;
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
 }
 
 .row {

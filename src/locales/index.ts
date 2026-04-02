@@ -18,7 +18,8 @@ export const messages = {
       channelDesc: "设置图标更新的通道",
       moduleVersion: "模块版本",
       iconsVersion: "图标版本",
-      packagesCount: "适配图标",
+      packagesCount: "应用",
+      adaptedCount: "已适配",
     },
 
     update: {
@@ -72,7 +73,8 @@ export const messages = {
       channelDesc: "Set the update channel for icons",
       moduleVersion: "Module Version",
       iconsVersion: "Icons Version",
-      packagesCount: "Icons",
+      packagesCount: "Application",
+      adaptedCount: "Adapted",
     },
 
     update: {
