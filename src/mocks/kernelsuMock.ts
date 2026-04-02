@@ -46,6 +46,8 @@ export const mockSpawn = () => {
   let stderrCb: any;
   let exitCb: any;
 
+  console.log(stderrCb);
+
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   (async () => {

@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { useI18n } from "../composables/useI18n";
-import { useConfigStore } from "../stores/configStore";
-import type { Channel } from "../types/config";
 
 import "@material/web/select/outlined-select.js";
 import "@material/web/select/select-option.js";
@@ -9,14 +7,6 @@ import "@material/web/icon/icon.js";
 import { ICONS } from "../constants";
 
 const { t } = useI18n();
-const { config, setChannel } = useConfigStore();
-
-const channelOptions: Channel[] = ["stable", "beta"];
-
-const handleChannelChange = (e: Event) => {
-  const value = (e.target as HTMLSelectElement).value as Channel;
-  setChannel(value);
-};
 </script>
 
 <template>
@@ -37,22 +27,22 @@ const handleChannelChange = (e: Event) => {
         </div>
       </div>
 
-      <md-outlined-select
-        class="full-width-field"
-        :label="t('label.channel')"
-        :value="config.default.channel"
-        @change="handleChannelChange"
-      >
-        <md-select-option v-for="item in channelOptions" :key="item" :value="item">
-          {{ t(`channel.${item}`) }}
-        </md-select-option>
-
-        <md-icon slot="leading-icon">
-          <svg viewBox="0 0 24 24">
-            <path :d="ICONS.channel" />
-          </svg>
-        </md-icon>
-      </md-outlined-select>
+      <!-- <md-outlined-select -->
+      <!--   class="full-width-field" -->
+      <!--   :label="t('label.channel')" -->
+      <!--   :value="config.default.channel" -->
+      <!--   @change="handleChannelChange" -->
+      <!-- > -->
+      <!--   <md-select-option v-for="item in channelOptions" :key="item" :value="item"> -->
+      <!--     {{ t(`channel.${item}`) }} -->
+      <!--   </md-select-option> -->
+      <!---->
+      <!--   <md-icon slot="leading-icon"> -->
+      <!--     <svg viewBox="0 0 24 24"> -->
+      <!--       <path :d="ICONS.channel" /> -->
+      <!--     </svg> -->
+      <!--   </md-icon> -->
+      <!-- </md-outlined-select> -->
     </section>
   </div>
 </template>

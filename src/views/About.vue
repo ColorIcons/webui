@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { useI18n } from "../composables/useI18n";
 import { ICONS, PATHS } from "../constants";
-import { useConfigStore } from "../stores/configStore";
+// import { useConfigStore } from "../stores/configStore";
 import "@material/web/button/filled-button";
 
 const { t } = useI18n();
 
-const { config } = useConfigStore();
+// const { config } = useConfigStore();
 
 const toGithub = () => {};
 </script>
@@ -16,7 +16,7 @@ const toGithub = () => {};
     <h4 class="title">{{ t("label.moduleVersion") }}</h4>
     <div>{{ PATHS.VERSION }}</div>
     <h4 class="title">{{ t("label.iconsVersion") }}</h4>
-    <div>{{ config.default.icons_version }}</div>
+    <!-- <div>{{ config.default.icons_version }}</div> -->
     <md-filled-button @click="toGithub" class="github-btn">
       <md-icon slot="icon">
         <svg viewBox="0 0 24 24">

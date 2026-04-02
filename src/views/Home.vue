@@ -19,7 +19,6 @@ interface UpdateInfo {
 
 const api = useAPI();
 
-const loading = ref(true);
 const checking = ref(true);
 const update = ref<UpdateInfo | null>(null);
 
@@ -39,26 +38,40 @@ const STAGE_LABEL: Record<string, string> = {
   download: t("update.download"),
 };
 
-onMounted(async () => {
-  try {
-    const [updateRes, pc, ac] = await Promise.all([
-      api.checkUpdate().catch(() => null),
-      api.getPackagesCount?.().catch(() => null),
-      api.getAdaptedCount?.().catch(() => null),
-    ]);
+const getInfo = async () => {
+  api
+    .getPackagesCount?.()
+    .then((pc) => {
+      if (typeof pc === "number") packageCount.value = pc;
+    })
+    .catch(() => {});
 
-    if (updateRes)
-      update.value = {
-        updated: updateRes.updated,
-        old_version: formatDate(updateRes.old_generated_at * 1000),
-        new_version: formatDate(updateRes.new_generated_at * 1000),
-      };
-    if (typeof pc === "number") packageCount.value = pc;
-    if (typeof ac === "number") adaptedCount.value = ac;
-  } finally {
-    loading.value = false;
-    checking.value = false;
-  }
+  api
+    .getAdaptedCount?.()
+    .then((ac) => {
+      if (typeof ac === "number") adaptedCount.value = ac;
+    })
+    .catch(() => {});
+
+  api
+    .checkUpdate()
+    .then((updateRes) => {
+      if (updateRes) {
+        update.value = {
+          updated: updateRes.updated,
+          old_version: formatDate(updateRes.old_generated_at * 1000),
+          new_version: formatDate(updateRes.new_generated_at * 1000),
+        };
+      }
+    })
+    .catch(() => {})
+    .finally(() => {
+      checking.value = false;
+    });
+};
+
+onMounted(() => {
+  getInfo();
 });
 
 const formatDate = (iso: number) => new Date(iso).toLocaleString();
@@ -98,6 +111,7 @@ const handleUpdate = async () => {
         case "done":
           stage.value = t("update.done");
           progress.value = 100;
+          getInfo();
           break;
 
         case "error":
@@ -139,14 +153,14 @@ const handleUpdate = async () => {
       <template v-else-if="update?.updated">
         <h2 class="title">{{ t("update.found") }}</h2>
 
-        <div class="info">
+        <div class="update-info">
           <div class="row">
             <span>{{ t("update.currentVersion") }}</span>
-            <span>{{ update.new_version }}</span>
+            <span>{{ update.old_version }}</span>
           </div>
           <div class="row">
             <span>{{ t("update.latestVersion") }}</span>
-            <span class="highlight">{{ update.old_version }}</span>
+            <span class="highlight">{{ update.new_version }}</span>
           </div>
         </div>
 

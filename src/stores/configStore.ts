@@ -1,18 +1,19 @@
 import { ref, readonly } from "vue";
-import type { Channel, Config } from "../types/config";
+import type { Config } from "../types/config";
 import { useAPI } from "../composables/useApi";
 
 const defaultConfig: Config = {
-  default: {
-    icons_version: "",
-    channel: "stable",
-    runtime_dir: "",
-    temp_dir: "",
-    target_dir: "",
+  icons: {
+    light: true,
+    dark: false,
+    mat: false,
+    monochrome: true,
   },
-  source: {
-    beta: { url: "" },
-    stable: { url: "" },
+  network: {
+    concurrency: 4,
+  },
+  repo: {
+    base_url: "https://coloricons.github.io/icons/",
   },
 };
 
@@ -28,21 +29,17 @@ const mergeConfig = (remote: Partial<Config>): Config => {
   return {
     ...defaultConfig,
     ...remote,
-    default: {
-      ...defaultConfig.default,
-      ...remote.default,
+    icons: {
+      ...defaultConfig.icons,
+      ...remote.icons,
     },
-    source: {
-      ...defaultConfig.source,
-      ...remote.source,
-      beta: {
-        ...defaultConfig.source.beta,
-        ...remote.source?.beta,
-      },
-      stable: {
-        ...defaultConfig.source.stable,
-        ...remote.source?.stable,
-      },
+    network: {
+      ...defaultConfig.network,
+      ...remote.network,
+    },
+    repo: {
+      ...defaultConfig.repo,
+      ...remote.repo,
     },
   };
 };
@@ -71,25 +68,11 @@ const getConfig = async (): Promise<Config> => {
   return fetchPromise;
 };
 
-const setChannel = async (channel: Channel) => {
-  const prev = config.value.default.channel;
-
-  config.value.default.channel = channel;
-
-  try {
-    await api.setChannel(channel);
-  } catch (e) {
-    config.value.default.channel = prev;
-    throw e;
-  }
-};
-
 export const useConfigStore = () => {
   return {
     config: readonly(config),
     loading: readonly(loading),
     error: readonly(error),
     getConfig,
-    setChannel,
   };
 };
