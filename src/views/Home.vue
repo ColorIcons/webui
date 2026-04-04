@@ -128,51 +128,60 @@ const handleUpdate = async () => {
 </script>
 
 <template>
-  <div class="container">
-    <div class="info" style="margin-top: 12px">
-      <div class="packages-count-card">
-        <span>{{ t("label.packagesCount") }}</span>
-
-        <span v-if="packageCount !== null" class="value">{{ packageCount }}</span>
-        <span v-else>{{ t("common.calculating") }}</span>
+  <div class="update-panel">
+    <div class="update-panel__stats">
+      <div class="stat-card">
+        <span class="stat-card__label">{{ t("label.packagesCount") }}</span>
+        <span v-if="packageCount !== null" class="stat-card__value">
+          {{ packageCount }}
+        </span>
+        <span v-else class="stat-card__placeholder">
+          {{ t("common.calculating") }}
+        </span>
       </div>
-      <div class="packages-count-card">
-        <span>{{ t("label.adaptedCount") }}</span>
 
-        <span v-if="packageCount !== null" class="value">{{ adaptedCount }}</span>
-        <span v-else>{{ t("common.calculating") }}</span>
+      <div class="stat-card">
+        <span class="stat-card__label">{{ t("label.adaptedCount") }}</span>
+        <span v-if="adaptedCount !== null" class="stat-card__value">
+          {{ adaptedCount }}
+        </span>
+        <span v-else class="stat-card__placeholder">
+          {{ t("common.calculating") }}
+        </span>
       </div>
     </div>
 
     <div class="update-card">
-      <div v-if="checking" style="display: flex">
-        <div>{{ t("update.checking") }}</div>
-        <md-circular-progress indeterminate style="margin-left: auto" />
+      <div v-if="checking" class="update-card__checking">
+        <span>{{ t("update.checking") }}</span>
+        <md-circular-progress indeterminate />
       </div>
 
       <template v-else-if="update?.updated">
-        <h2 class="title">{{ t("update.found") }}</h2>
+        <h2 class="update-card__title">{{ t("update.found") }}</h2>
 
-        <div class="update-info">
-          <div class="row">
+        <div class="update-card__info">
+          <div class="update-card__row">
             <span>{{ t("update.currentVersion") }}</span>
             <span>{{ update.old_version }}</span>
           </div>
-          <div class="row">
+          <div class="update-card__row">
             <span>{{ t("update.latestVersion") }}</span>
-            <span class="highlight">{{ update.new_version }}</span>
+            <span class="update-card__value--highlight">
+              {{ update.new_version }}
+            </span>
           </div>
         </div>
 
-        <div v-if="updating" class="progress">
-          <div class="stage">{{ stage }}</div>
+        <div v-if="updating" class="update-progress">
+          <div class="update-progress__stage">{{ stage }}</div>
 
           <md-linear-progress :value="progress / 100" />
 
-          <div class="percent">{{ progress }}%</div>
+          <div class="update-progress__percent">{{ progress }}%</div>
         </div>
 
-        <md-filled-button :disabled="updating" @click="handleUpdate" class="update-btn">
+        <md-filled-button class="update-card__action" :disabled="updating" @click="handleUpdate">
           <md-icon slot="icon">
             <svg viewBox="0 0 24 24">
               <path :d="ICONS.update" />
@@ -182,95 +191,118 @@ const handleUpdate = async () => {
         </md-filled-button>
       </template>
 
-      <div v-else>{{ t("update.upToDate") }}</div>
+      <div v-else class="update-card__empty">
+        {{ t("update.upToDate") }}
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.container {
+.update-panel {
   width: 100%;
 }
 
-.update-card {
-  width: 100%;
-  border-radius: 16px;
-  padding: 20px;
-
-  color: var(--md-sys-color-on-secondary-container);
-  background: var(--md-sys-color-secondary-container);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.title {
-  margin: 0 0 16px;
-  font-size: 20px;
-  text-align: center;
-}
-
-.info {
+.update-panel__stats {
   display: flex;
   gap: 8px;
+  margin-bottom: 10px;
 }
 
-.packages-count-card {
+.stat-card {
+  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-evenly;
-  font-size: 14px;
-  color: var(--md-sys-color-on-surface-variant);
-  width: 100%;
-  margin-bottom: 10px;
   padding: 20px;
-  background: var(--md-sys-color-surface-container);
   border-radius: 16px;
+
+  font-size: 14px;
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
-.packages-count-card .value {
-  font-size: 20px;
+.stat-card__value {
   margin-top: 4px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--md-sys-color-on-surface);
 }
 
-.row {
+.stat-card__placeholder {
+  opacity: 0.6;
+}
+
+/* ===== update card ===== */
+.update-card {
+  padding: 20px;
+  border-radius: 16px;
+
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.update-card__title {
+  margin-bottom: 16px;
+  font-size: 20px;
+  text-align: center;
+}
+
+.update-card__checking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.update-card__checking md-circular-progress {
+  margin-left: auto;
+}
+
+.update-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.update-card__row {
   display: flex;
   justify-content: space-between;
   font-size: 14px;
   opacity: 0.9;
 }
 
-.highlight {
+.update-card__value--highlight {
   color: var(--md-sys-color-primary);
   font-weight: 500;
 }
 
-.progress {
+.update-card__action {
+  margin-top: 16px;
+  width: 100%;
+}
+
+.update-card__empty {
+  text-align: center;
+}
+
+/* ===== progress ===== */
+.update-progress {
   margin-top: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.stage {
+.update-progress__stage {
   font-size: 13px;
   opacity: 0.7;
 }
 
-.percent {
+.update-progress__percent {
   font-size: 12px;
   text-align: right;
   opacity: 0.6;
-}
-
-.notes {
-  margin-top: 12px;
-  font-size: 13px;
-  opacity: 0.75;
-}
-
-.update-btn {
-  margin-top: 16px;
-  width: 100%;
 }
 </style>
