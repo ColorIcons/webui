@@ -15,6 +15,7 @@ function setPage(p: TabKey) {
 
 let startX = 0;
 let startTime = 0;
+let startY = 0;
 
 const deltaX = ref(0);
 const isDragging = ref(false);
@@ -34,19 +35,28 @@ const innerStyle = computed(() => {
 
 function onTouchStart(e: TouchEvent) {
   startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
   startTime = Date.now();
   isDragging.value = true;
 }
 
 function onTouchMove(e: TouchEvent) {
   const x = e.touches[0].clientX;
-  let dx = x - startX;
+  const y = e.touches[0].clientY;
+  const dx = x - startX;
+  const dy = y - startY;
 
-  if ((currentIndex.value === 0 && dx > 0) || (currentIndex.value === pageCount - 1 && dx < 0)) {
-    dx *= 0.35;
+  if (Math.abs(dx) < Math.abs(dy)) {
+    deltaX.value = 0;
+    return;
   }
 
-  deltaX.value = dx;
+  let adjustedDx = dx;
+  if ((currentIndex.value === 0 && dx > 0) || (currentIndex.value === pageCount - 1 && dx < 0)) {
+    adjustedDx *= 0.35;
+  }
+
+  deltaX.value = adjustedDx;
 }
 
 function onTouchEnd() {
