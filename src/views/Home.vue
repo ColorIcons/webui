@@ -118,7 +118,7 @@ const handleUpdate = async () => {
 </script>
 
 <template>
-  <div class="update-panel">
+  <div class="container">
     <div class="update-panel__stats">
       <div class="stat-card">
         <span class="stat-card__label">{{ t("label.packagesCount") }}</span>
@@ -189,8 +189,9 @@ const handleUpdate = async () => {
 </template>
 
 <style scoped>
-.update-panel {
+.container {
   width: 100%;
+  padding-top: 24px;
 }
 
 .update-panel__stats {

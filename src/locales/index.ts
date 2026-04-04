@@ -18,6 +18,8 @@ export const messages = {
       channelDesc: "设置图标更新的通道，Github 不可用时使用 Cloudflare",
       iconStyle: "图标风格",
       iconStyleDesc: "选择你想启用的图标类型",
+      concurrency: "并发数",
+      concurrencyDesc: "同时下载的文件数量，建议 4-8",
 
       iconThemes: {
         light: "浅色图标",
@@ -89,6 +91,8 @@ export const messages = {
       channelDesc: "Sets the channel for icon updates; uses Cloudflare when GitHub is unavailable",
       iconStyle: "Icon Style",
       iconStyleDesc: "Choose which icon styles to enable",
+      concurrency: "Concurrency",
+      concurrencyDesc: "Simultaneously downloaded file count, recommended 4-8",
 
       iconThemes: {
         light: "Light Icons",

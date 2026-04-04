@@ -129,7 +129,7 @@ onBeforeMount(() => {
 .page {
   width: 100vw;
   flex-shrink: 0;
-  padding: 20px 10px 80px;
+  padding: 0 10px 80px;
   overflow-y: auto;
 }
 </style>

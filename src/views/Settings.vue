@@ -23,6 +23,8 @@ const channelOptions = [
   { label: "Cloudflare", value: "https://icons.immort.top/" },
 ];
 
+const concurrencyOptions = [4, 5, 6, 7, 8];
+
 interface IconThemeOption {
   key: keyof Config["icons"];
   label: string;
@@ -45,6 +47,11 @@ onBeforeMount(async () => {
 const handleChannelChange = (e: Event) => {
   if (!config.value) return;
   config.value.repo.base_url = (e.target as HTMLSelectElement).value;
+};
+
+const handleConcurrencyChange = (e: Event) => {
+  if (!config.value) return;
+  config.value.network.concurrency = Number((e.target as HTMLSelectElement).value);
 };
 
 const toggleTheme = (key: keyof Config["icons"]) => {
@@ -126,11 +133,33 @@ const toast = ref({
           <md-select-option v-for="item in channelOptions" :key="item.value" :value="item.value">
             {{ item.label }}
           </md-select-option>
-          <md-icon slot="leading-icon">
-            <svg viewBox="0 0 24 24"><path :d="ICONS.channel" /></svg>
-          </md-icon>
         </md-outlined-select>
       </section>
+
+      <section class="settings-section">
+        <div class="settings-section__header">
+          <div class="settings-section__icon">
+            <md-icon>
+              <svg viewBox="0 0 24 24"><path :d="ICONS.network" /></svg>
+            </md-icon>
+          </div>
+          <div class="settings-section__meta">
+            <span class="settings-section__title">{{ t("settings.concurrency") }}</span>
+            <span class="settings-section__desc">{{ t("settings.concurrencyDesc") }}</span>
+          </div>
+        </div>
+        <md-outlined-select
+          class="settings-section__field"
+          :label="t('settings.concurrency')"
+          :value="String(config.network.concurrency)"
+          @change="handleConcurrencyChange"
+        >
+          <md-select-option v-for="n in concurrencyOptions" :key="n" :value="String(n)">
+            {{ n }}
+          </md-select-option>
+        </md-outlined-select>
+      </section>
+
       <section class="settings-section">
         <div class="settings-section__header">
           <div class="settings-section__icon">
@@ -166,6 +195,7 @@ const toast = ref({
         </div>
       </section>
     </div>
+
     <md-fab
       v-if="isDirty"
       class="settings-fab"
@@ -177,25 +207,30 @@ const toast = ref({
         <svg viewBox="0 0 24 24"><path :d="ICONS.save" /></svg>
       </md-icon>
     </md-fab>
+
     <div v-if="toast.show" class="toast">
       {{ toast.text }}
     </div>
   </div>
 </template>
+
 <style scoped>
 .settings-page {
   position: relative;
   width: 100%;
   height: 100%;
 }
+
 .settings-panel {
   display: flex;
+  padding-top: 24px;
   flex-direction: column;
   gap: 24px;
   padding-bottom: 96px;
   height: 100%;
   overflow-y: auto;
 }
+
 .settings-section {
   display: flex;
   flex-direction: column;
@@ -204,11 +239,13 @@ const toast = ref({
   border-radius: 20px;
   background: var(--md-sys-color-surface-container);
 }
+
 .settings-section__header {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
 .settings-section__icon {
   width: 40px;
   height: 40px;
@@ -220,28 +257,34 @@ const toast = ref({
   background: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
 }
+
 .settings-section__meta {
   display: flex;
   flex-direction: column;
 }
+
 .settings-section__title {
   font-size: 16px;
   font-weight: 500;
   color: var(--md-sys-color-on-surface);
 }
+
 .settings-section__desc {
   font-size: 12px;
   color: var(--md-sys-color-on-surface-variant);
 }
+
 .settings-section__field {
   width: 100%;
   --md-outlined-text-field-container-shape: 16px;
 }
+
 .icon-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
+
 .icon-tile {
   position: relative;
   display: flex;
@@ -253,20 +296,26 @@ const toast = ref({
   border: none;
   text-align: left;
   cursor: pointer;
-  background: var(--md-sys-color-surface-container-low);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
   transition:
     transform 0.2s,
     background-color 0.2s;
 }
+
 .icon-tile:active {
   transform: scale(0.98);
 }
+
 .icon-tile.is-active {
-  background: var(--md-sys-color-secondary-container);
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
 }
+
 .icon-tile__top {
   pointer-events: none;
 }
+
 .icon-tile__icon {
   width: 32px;
   height: 32px;
@@ -277,18 +326,21 @@ const toast = ref({
   background: var(--md-sys-color-surface-container-highest);
   color: var(--md-sys-color-on-surface-variant);
 }
+
 .icon-tile.is-active .icon-tile__icon {
-  background: var(--md-sys-color-secondary);
-  color: var(--md-sys-color-on-secondary);
+  background: var(--md-sys-color-on-tertiary-container);
+  color: var(--md-sys-color-tertiary-container);
 }
+
 .icon-tile__bottom {
   pointer-events: none;
 }
+
 .icon-tile__label {
   font-size: 15px;
   font-weight: 500;
-  color: var(--md-sys-color-on-surface);
 }
+
 .settings-fab {
   position: absolute;
   right: 0;
@@ -307,13 +359,10 @@ const toast = ref({
   transform: translateX(-50%);
   padding: 10px 16px;
   border-radius: 12px;
-
   background: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
-
   font-size: 14px;
   box-shadow: var(--md-sys-elevation-level3);
-
   opacity: 0;
   animation: toast-in-out 2s forwards;
 }
