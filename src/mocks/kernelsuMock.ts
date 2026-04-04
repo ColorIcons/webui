@@ -30,6 +30,10 @@ export const mockExec = async (cmd: string) => {
     return { errno: 0, stdout: JSON.stringify(mockConfig), stderr: "" };
   }
 
+  if (cmd.includes("config set")) {
+    return { errno: 0, stdout: JSON.stringify(mockConfig), stderr: "" };
+  }
+
   if (cmd.includes("check")) {
     return { errno: 0, stdout: JSON.stringify(mockUpdate), stderr: "" };
   }

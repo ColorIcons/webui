@@ -39,12 +39,12 @@ interface UpdateInfoRes {
 }
 
 export type UpdateEvent =
-  | { type: "stage"; value: string }
-  | { type: "progress"; stage: string; value: number }
-  | { type: "info"; value?: string; version?: string; message?: string }
-  | { type: "done" }
+  | { type: "stage"; value: string; message: string }
+  | { type: "progress"; value: number }
+  | { type: "done"; message: string; packages_downloaded: number }
   | { type: "log"; message: string }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "exit" };
 
 let ksuExec: KsuExec | null = null;
 let ksuSpawn: KsuSpawn | null = null;
@@ -132,8 +132,27 @@ export function useAPI() {
   };
 
   const checkUpdate = async (): Promise<UpdateInfoRes> => {
-    const stdout = await execOrThrow(`${PATHS.CIP_BIN} check --json`);
-    return JSON.parse(stdout);
+    const spawn = await ensureSpawn();
+    const child = spawn(PATHS.CIP_BIN, ["check", "--json"]);
+
+    return new Promise<UpdateInfoRes>((resolve, reject) => {
+      let buffer = "";
+
+      child.stdout.on("data", (chunk) => {
+        buffer += chunk;
+      });
+
+      child.on("exit", (code) => {
+        if (code !== 0) return reject(new Error(`exit code ${code}`));
+        try {
+          resolve(JSON.parse(buffer));
+        } catch (e) {
+          reject(e);
+        }
+      });
+
+      child.stderr.on("data", (err) => console.error(err));
+    });
   };
 
   const setConfig = async (options: {
@@ -262,7 +281,7 @@ export function useAPI() {
           return;
         }
 
-        onEvent({ type: "done" });
+        onEvent({ type: "exit" });
 
         onDone?.();
         resolve();

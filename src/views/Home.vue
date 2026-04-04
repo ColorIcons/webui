@@ -29,12 +29,8 @@ const updating = ref(false);
 const progress = ref(0);
 const stage = ref(t("update.fetch"));
 
-const currentStage = ref<string>("fetch");
-
 const STAGE_LABEL: Record<string, string> = {
   fetch: t("update.fetch"),
-  download_global: t("update.download"),
-  download_package: t("update.download"),
   download: t("update.download"),
 };
 
@@ -70,8 +66,8 @@ const getInfo = async () => {
     });
 };
 
-onMounted(() => {
-  getInfo();
+onMounted(async () => {
+  await getInfo();
 });
 
 const formatDate = (iso: number) => new Date(iso).toLocaleString();
@@ -80,7 +76,6 @@ const handleUpdate = async () => {
   updating.value = true;
   progress.value = 0;
   stage.value = t("update.preparing");
-  currentStage.value = "fetch";
 
   try {
     await api.updateStream((msg) => {
@@ -89,7 +84,6 @@ const handleUpdate = async () => {
       switch (msg.type) {
         case "stage": {
           const s = msg.value as string;
-          currentStage.value = s;
 
           stage.value = STAGE_LABEL[s] ?? s;
           break;
@@ -103,10 +97,6 @@ const handleUpdate = async () => {
           progress.value = Math.max(progress.value, Math.floor(percent));
           break;
         }
-
-        case "info":
-          if (msg.message) stage.value = msg.message;
-          break;
 
         case "done":
           stage.value = t("update.done");

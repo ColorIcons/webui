@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onBeforeMount, computed } from "vue";
+import { ref, onBeforeMount, computed, toRaw } from "vue";
 import { useI18n } from "../composables/useI18n";
 import { useConfigStore } from "../stores/configStore";
 import type { Config } from "../types/config";
@@ -38,7 +38,7 @@ const iconThemeOptions = computed<IconThemeOption[]>(() => [
 
 onBeforeMount(async () => {
   const res = await getConfig();
-  config.value = structuredClone(res);
+  config.value = structuredClone(toRaw(res));
   original.value = res;
 });
 
@@ -83,11 +83,23 @@ const save = async () => {
 
     await setConfig(payload);
 
-    original.value = structuredClone(config.value);
+    original.value = structuredClone(toRaw(config.value));
+
+    toast.value.text = t("settings.saved") || "Saved successfully";
+    toast.value.show = true;
+
+    setTimeout(() => {
+      toast.value.show = false;
+    }, 1500);
   } finally {
     saving.value = false;
   }
 };
+
+const toast = ref({
+  show: false,
+  text: "",
+});
 </script>
 
 <template>
@@ -165,6 +177,9 @@ const save = async () => {
         <svg viewBox="0 0 24 24"><path :d="ICONS.save" /></svg>
       </md-icon>
     </md-fab>
+    <div v-if="toast.show" class="toast">
+      {{ toast.text }}
+    </div>
   </div>
 </template>
 <style scoped>
@@ -283,5 +298,41 @@ const save = async () => {
 .settings-fab.is-disabled {
   opacity: 0.5;
   pointer-events: none;
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 12px;
+
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+
+  font-size: 14px;
+  box-shadow: var(--md-sys-elevation-level3);
+
+  opacity: 0;
+  animation: toast-in-out 2s forwards;
+}
+
+@keyframes toast-in-out {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
 }
 </style>

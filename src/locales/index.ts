@@ -27,6 +27,7 @@ export const messages = {
       },
 
       save: "保存",
+      saved: "已保存",
     },
 
     label: {
@@ -97,6 +98,7 @@ export const messages = {
       },
 
       save: "Save",
+      saved: "Saved",
     },
 
     label: {
