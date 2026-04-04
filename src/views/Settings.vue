@@ -15,7 +15,7 @@ const { t } = useI18n();
 const { getConfig, setConfig } = useConfigStore();
 
 const config = ref<Config>(DEFAULT_CONFIG);
-const original = ref<Config | null>(null);
+const original = ref<Config>(DEFAULT_CONFIG);
 const saving = ref(false);
 
 const channelOptions = [
@@ -48,7 +48,6 @@ const handleChannelChange = (e: Event) => {
 };
 
 const toggleTheme = (key: keyof Config["icons"]) => {
-  if (!config.value) return;
   config.value.icons[key] = !config.value.icons[key];
 };
 
@@ -75,8 +74,8 @@ const save = async () => {
     }
 
     (["light", "dark", "mat", "monochrome"] as const).forEach((k) => {
-      if (config.value!.icons[k] !== original.value!.icons[k]) {
-        payload[k] = config.value!.icons[k];
+      if (config.value.icons[k] !== original.value.icons[k]) {
+        payload[k] = config.value.icons[k];
       }
     });
 

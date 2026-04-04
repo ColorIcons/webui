@@ -59,9 +59,17 @@ const setConfig = async (options: {
   error.value = null;
 
   try {
-    await api.setConfig(options);
+    await api.setConfig({
+      baseUrl: options.baseUrl,
+      icons: {
+        light: options.light,
+        dark: options.dark,
+        mat: options.mat,
+        monochrome: options.monochrome,
+      },
+      concurrency: options.concurrency,
+    });
 
-    // 同步 store
     if (options.baseUrl !== undefined) {
       config.value.repo.base_url = options.baseUrl;
     }
