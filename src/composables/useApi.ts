@@ -136,6 +136,40 @@ export function useAPI() {
     return JSON.parse(stdout);
   };
 
+  const setConfig = async (options: {
+    baseUrl?: string;
+    concurrency?: number;
+    icons?: {
+      light?: boolean;
+      dark?: boolean;
+      mat?: boolean;
+      monochrome?: boolean;
+    };
+  }) => {
+    const args: string[] = [];
+
+    if (options.baseUrl !== undefined) {
+      args.push("--base-url", options.baseUrl);
+    }
+
+    if (options.concurrency !== undefined) {
+      args.push("--concurrency", String(options.concurrency));
+    }
+
+    if (options.icons) {
+      const { light, dark, mat, monochrome } = options.icons;
+
+      if (light !== undefined) args.push("--light", String(light));
+      if (dark !== undefined) args.push("--dark", String(dark));
+      if (mat !== undefined) args.push("--mat", String(mat));
+      if (monochrome !== undefined) args.push("--monochrome", String(monochrome));
+    }
+
+    if (!args.length) return;
+
+    await execOrThrow(`${PATHS.CIP_BIN} config set ${args.join(" ")}`);
+  };
+
   const updateStream = async (
     onEvent: (e: UpdateEvent) => void,
     onDone?: () => void,
@@ -254,5 +288,6 @@ export function useAPI() {
     getAdaptedCount,
     getPackagesCount,
     updateStream,
+    setConfig,
   };
 }

@@ -11,11 +11,25 @@ export const messages = {
       home: "状态",
       settings: "配置",
       about: "关于",
+      mono: "莫奈",
+    },
+    settings: {
+      channel: "更新通道",
+      channelDesc: "设置图标更新的通道，Github 不可用时使用 Cloudflare",
+      iconStyle: "图标风格",
+      iconStyleDesc: "选择你想启用的图标类型",
+
+      iconThemes: {
+        light: "浅色图标",
+        dark: "深色图标",
+        mat: "Material 风格",
+        monochrome: "单色图标",
+      },
+
+      save: "保存",
     },
 
     label: {
-      channel: "更新通道",
-      channelDesc: "设置图标更新的通道",
       moduleVersion: "模块版本",
       iconsVersion: "图标版本",
       packagesCount: "应用",
@@ -66,11 +80,26 @@ export const messages = {
       home: "Status",
       settings: "Settings",
       about: "About",
+      mono: "Monochrome",
+    },
+
+    settings: {
+      channel: "Update Channel",
+      channelDesc: "Sets the channel for icon updates; uses Cloudflare when GitHub is unavailable",
+      iconStyle: "Icon Style",
+      iconStyleDesc: "Choose which icon styles to enable",
+
+      iconThemes: {
+        light: "Light Icons",
+        dark: "Dark Icons",
+        mat: "Material Style",
+        monochrome: "Monochrome",
+      },
+
+      save: "Save",
     },
 
     label: {
-      channel: "Update Channel",
-      channelDesc: "Set the update channel for icons",
       moduleVersion: "Module Version",
       iconsVersion: "Icons Version",
       packagesCount: "Application",

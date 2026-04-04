@@ -4,16 +4,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const mockConfig: Config = {
   icons: {
-    light: false,
+    light: true,
     dark: false,
     mat: false,
-    monochrome: false,
+    monochrome: true,
   },
   network: {
     concurrency: 0,
   },
   repo: {
-    base_url: "",
+    base_url: "https://icons.immort.top/",
   },
 };
 
