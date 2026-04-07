@@ -23,7 +23,7 @@ const channelOptions = [
   { label: "Cloudflare", value: "https://icons.immort.top/" },
 ];
 
-const concurrencyOptions = [4, 5, 6, 7, 8];
+const concurrencyOptions = [8, 16, 20, 24, 32];
 
 interface IconThemeOption {
   key: keyof Config["icons"];

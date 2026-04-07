@@ -1,5 +1,6 @@
 import { PATHS } from "../constants";
 import type { Config } from "../types/config";
+import type { Package } from "../types/package";
 
 interface ExecOptions {
   cwd?: string;
@@ -10,6 +11,15 @@ interface ExecResult {
   errno: number;
   stdout: string;
   stderr: string;
+}
+
+interface PackagesInfo {
+  packageName: string;
+  versionName: string;
+  versionCode: number;
+  appLabel: string;
+  isSystem: boolean;
+  uid: number;
 }
 
 type KsuExec = (cmd: string, options?: ExecOptions) => Promise<ExecResult>;
@@ -46,8 +56,11 @@ export type UpdateEvent =
   | { type: "error"; message: string }
   | { type: "exit" };
 
+type GetPackagesInfo = (packages: string[]) => PackagesInfo[];
+
 let ksuExec: KsuExec | null = null;
 let ksuSpawn: KsuSpawn | null = null;
+let getPackagesInfo: GetPackagesInfo | null = null;
 let initPromise: Promise<void> | null = null;
 
 const initKernelSU = async () => {
@@ -62,6 +75,7 @@ const initKernelSU = async () => {
 
         ksuExec = mock.mockExec;
         ksuSpawn = mock.mockSpawn;
+        getPackagesInfo = mock.mockGetPackagesInfo;
         return;
       }
 
@@ -71,6 +85,7 @@ const initKernelSU = async () => {
 
         ksuExec = api.exec ?? null;
         ksuSpawn = api.spawn ?? null;
+        getPackagesInfo = api.getPackagesInfo ?? null;
 
         console.log("[KernelSU] loaded:", {
           exec: !!ksuExec,
@@ -108,6 +123,31 @@ export function useAPI() {
     }
 
     return stdout.trim();
+  };
+
+  const getAllPackages = async (): Promise<Package[]> => {
+    const stdout = await execOrThrow(`${PATHS.CIP_BIN} package list --json`);
+
+    const packages = JSON.parse(stdout) as {
+      package_name: string;
+      is_adapted: boolean;
+    }[];
+
+    const packagesMap = new Map<string, boolean>(
+      packages.map((item) => [item.package_name, item.is_adapted]),
+    );
+
+    const packageNames = [...packagesMap.keys()];
+
+    const packagesInfo = getPackagesInfo?.(packageNames) || [];
+
+    const packageList: Package[] = packagesInfo.map((info) => ({
+      label: info.appLabel,
+      packageName: info.packageName,
+      isAdapted: packagesMap.get(info.packageName) ?? false,
+    }));
+
+    return packageList;
   };
 
   const loadConfig = async (): Promise<Config> => {
@@ -306,6 +346,7 @@ export function useAPI() {
     checkUpdate,
     getAdaptedCount,
     getPackagesCount,
+    getAllPackages,
     updateStream,
     setConfig,
   };
