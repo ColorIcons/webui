@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, reactive, watchEffect } from "vue";
+import { ref, onMounted, computed, shallowRef, type ComponentPublicInstance } from "vue";
 
 import "@material/web/button/filled-button";
 import "@material/web/progress/circular-progress";
@@ -50,18 +50,29 @@ const sizeMap: Record<string, { col: number; row: number }> = {
   "2x2": { col: 2, row: 2 },
 };
 
-const iconStatus = reactive<
-  Record<
-    string,
-    {
-      monet: Record<string, boolean>;
-      light: Record<string, boolean>;
-      dark: Record<string, boolean>;
-      material: Record<string, boolean>;
-      checked: boolean;
-    }
-  >
->({});
+const MAX_CONCURRENT = 6;
+let running = 0;
+const queue: (() => void)[] = [];
+
+const runTask = async (task: () => Promise<void>) => {
+  if (running >= MAX_CONCURRENT) {
+    await new Promise<void>((resolve) => queue.push(resolve));
+  }
+  running++;
+  await task();
+  running--;
+  queue.shift()?.();
+};
+
+interface IconState {
+  monet: Record<string, boolean>;
+  light: Record<string, boolean>;
+  dark: Record<string, boolean>;
+  material: Record<string, boolean>;
+  checked: boolean;
+}
+
+const iconStatus = shallowRef<Record<string, IconState>>({});
 
 const getBaseUrl = (app: Package) => `/uxicons/${app.packageName}/`;
 
@@ -77,11 +88,6 @@ const getIconFileName = (size: string, type: string) => {
   return map[type];
 };
 
-const getImgStyle = (sz: string) =>
-  sz === "2x1" || sz === "1x1"
-    ? { height: "100%", width: "auto" }
-    : { width: "100%", height: "auto" };
-
 const checkImage = (url: string) =>
   new Promise<boolean>((resolve) => {
     const img = new Image();
@@ -89,6 +95,11 @@ const checkImage = (url: string) =>
     img.onerror = () => resolve(false);
     img.src = url;
   });
+
+const getImgStyle = (sz: string) =>
+  sz === "2x1" || sz === "1x1"
+    ? { height: "100%", width: "auto" }
+    : { width: "100%", height: "auto" };
 
 const checkSet = async (base: string, sizes: string[], type: string) => {
   const result: Record<string, boolean> = {};
@@ -114,7 +125,15 @@ const checkLight = async (base: string, sizes: string[]) => {
 
 const checkAppIcons = async (app: Package) => {
   const pkg = app.packageName;
-  if (iconStatus[pkg]?.checked) return;
+  if (iconStatus.value[pkg]?.checked) return;
+
+  const cacheKey = `icon-status:${pkg}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    iconStatus.value[pkg] = JSON.parse(cached);
+    iconStatus.value = { ...iconStatus.value };
+    return;
+  }
 
   const base = getBaseUrl(app);
   const sizes = ["2x1", "1x1", "2x2", "1x2"];
@@ -126,29 +145,56 @@ const checkAppIcons = async (app: Package) => {
     checkLight(base, sizes),
   ]);
 
-  iconStatus[pkg] = { monet, dark, material, light, checked: true };
+  const result: IconState = { monet, dark, material, light, checked: true };
+
+  iconStatus.value[pkg] = result;
+  iconStatus.value = { ...iconStatus.value };
+  localStorage.setItem(cacheKey, JSON.stringify(result));
+};
+
+const observed = new Set<string>();
+let observer: IntersectionObserver;
+
+const observeItem = (el: Element | ComponentPublicInstance | null, app: Package) => {
+  if (!el || !(el instanceof Element)) return;
+  const pkg = app.packageName;
+  (el as HTMLElement).dataset.pkg = pkg;
+
+  if (!observer) {
+    observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const pkg = (entry.target as HTMLElement).dataset.pkg!;
+        if (observed.has(pkg)) continue;
+        observed.add(pkg);
+        const app = packageList.value.find((a) => a.packageName === pkg);
+        if (app) runTask(() => checkAppIcons(app));
+      }
+    });
+  }
+
+  observer.observe(el);
 };
 
 const filteredApps = computed(() => {
   const query = searchQuery.value.toLowerCase();
-  return packageList.value.filter(
-    (app) =>
-      app.label?.toLowerCase().includes(query) || app.packageName.toLowerCase().includes(query),
-  );
+
+  return packageList.value
+    .filter(
+      (app) =>
+        app.label?.toLowerCase().includes(query) || app.packageName.toLowerCase().includes(query),
+    )
+    .sort((a, b) => (a.label || "").localeCompare(b.label || "", "zh-Hans-u-co-pinyin"));
 });
 
 const hasAnyIcons = (pkg: string) => {
-  const s = iconStatus[pkg];
+  const s = iconStatus.value[pkg];
   if (!s) return false;
   return Object.values(s[currentTheme.value] || {}).some(Boolean);
 };
 
 const hasIconSize = (pkg: string, sz: string) =>
-  iconStatus[pkg]?.[currentTheme.value]?.[sz] ?? false;
-
-watchEffect(() => {
-  filteredApps.value.forEach(checkAppIcons);
-});
+  iconStatus.value[pkg]?.[currentTheme.value]?.[sz] ?? false;
 
 const formatDate = (iso: number) => new Date(iso).toLocaleString();
 
@@ -251,7 +297,6 @@ const onAfterLeave = (el: Element) => {
 
 <template>
   <div class="container">
-    <!-- stats -->
     <section class="stats">
       <div class="stat-card">
         <span class="label">{{ t("label.packagesCount") }}</span>
@@ -266,7 +311,6 @@ const onAfterLeave = (el: Element) => {
       </div>
     </section>
 
-    <!-- update -->
     <transition
       @before-enter="onBeforeEnter"
       @enter="onEnter"
@@ -308,7 +352,6 @@ const onAfterLeave = (el: Element) => {
       </section>
     </transition>
 
-    <!-- toolbar -->
     <div class="toolbar">
       <div class="toolbar-inner">
         <input v-model="searchQuery" class="search" placeholder="输入关键字" />
@@ -326,9 +369,13 @@ const onAfterLeave = (el: Element) => {
       </div>
     </div>
 
-    <!-- list -->
     <main class="list">
-      <div v-for="app in filteredApps" :key="app.packageName" class="item">
+      <div
+        v-for="app in filteredApps"
+        :key="app.packageName"
+        class="item"
+        :ref="(el) => observeItem(el, app)"
+      >
         <div class="meta">
           <span class="title">{{ app.label }}</span>
         </div>
@@ -347,7 +394,6 @@ const onAfterLeave = (el: Element) => {
           >
             <md-ripple />
 
-            <!-- 统一渲染 -->
             <template v-if="currentTheme === 'light'">
               <img
                 :src="getBaseUrl(app) + getIconFileName(sz, 'bg')"
@@ -362,19 +408,23 @@ const onAfterLeave = (el: Element) => {
             </template>
 
             <img
-              v-else
-              :src="
-                getBaseUrl(app) +
-                getIconFileName(
-                  sz,
-                  currentTheme === 'monet'
-                    ? 'monochrome'
-                    : currentTheme === 'dark'
-                      ? 'night'
-                      : 'mat',
-                )
-              "
+              v-else-if="currentTheme === 'monet'"
+              :src="getBaseUrl(app) + getIconFileName(sz, 'monochrome')"
+              class="img monet"
+              :style="getImgStyle(sz)"
+            />
+
+            <img
+              v-else-if="currentTheme === 'dark'"
+              :src="getBaseUrl(app) + getIconFileName(sz, 'night')"
               class="img dark"
+              :style="getImgStyle(sz)"
+            />
+
+            <img
+              v-else
+              :src="getBaseUrl(app) + getIconFileName(sz, 'mat')"
+              class="img"
               :style="getImgStyle(sz)"
             />
           </div>
@@ -562,7 +612,11 @@ const onAfterLeave = (el: Element) => {
   transform: translate(-50%, -50%);
 }
 
-.dark {
+.icon .monet {
+  background: var(--md-sys-color-primary);
+}
+
+.icon .dark {
   background: radial-gradient(#292929, #202020);
 }
 
