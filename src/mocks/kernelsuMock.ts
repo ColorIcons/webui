@@ -53,11 +53,13 @@ function ok(stdout: string) {
   return { errno: 0, stdout, stderr: "" };
 }
 
-export const mockSpawn = (command: string, args: string[] = []) => {
+export const mockSpawn = (_: string, args: string[] = []) => {
   let stdoutCb: ((data: string) => void) | null = null;
   let stderrCb: ((data: string) => void) | null = null;
   let exitCb: ((code: number) => void) | null = null;
   let errorCb: ((err: any) => void) | null = null;
+
+  console.log(stderrCb);
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
