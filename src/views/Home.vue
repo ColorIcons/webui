@@ -613,7 +613,7 @@ const onAfterLeave = (el: Element) => {
 }
 
 .icon .monet {
-  background: var(--md-sys-color-primary);
+  background: var(--md-sys-color-secondary-container);
 }
 
 .icon .dark {
