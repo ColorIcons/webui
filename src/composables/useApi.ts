@@ -1,4 +1,5 @@
 import { PATHS } from "../constants";
+import type { UpdateInfoRes } from "../types/api";
 import type { Config } from "../types/config";
 import type { Package } from "../types/package";
 
@@ -41,12 +42,6 @@ interface ChildProcess {
 }
 
 type KsuSpawn = (command: string, args?: string[], options?: SpawnOptions) => ChildProcess;
-
-interface UpdateInfoRes {
-  updated: boolean;
-  old_generated_at: number;
-  new_generated_at: number;
-}
 
 export type UpdateEvent =
   | { type: "stage"; value: string; message: string }

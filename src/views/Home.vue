@@ -1,48 +1,44 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, shallowRef, type ComponentPublicInstance } from "vue";
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  computed,
+  shallowRef,
+  type ComponentPublicInstance,
+} from "vue";
 
-import "@material/web/button/filled-button";
-import "@material/web/progress/circular-progress";
-import "@material/web/progress/linear-progress";
 import "@material/web/textfield/outlined-text-field";
 import "@material/web/select/filled-select";
 import "@material/web/select/select-option";
 
 import { useAPI } from "../composables/useApi";
-import { ICONS } from "../constants";
 import { useI18n } from "../composables/useI18n";
 import type { Package } from "../types/package";
+import UpdateCard from "../components/UpdateCard.vue";
+import type { UpdateInfoRes } from "../types/api";
 
 type Theme = "monet" | "light" | "dark" | "material";
-
-interface UpdateInfo {
-  updated: boolean;
-  old_version: string;
-  new_version: string;
-}
 
 const { t } = useI18n();
 const api = useAPI();
 
+/* ------------------------ state ------------------------ */
 const showUpdateCard = ref(false);
-const update = ref<UpdateInfo | null>(null);
+const update = ref<UpdateInfoRes>({
+  updated: false,
+  old_generated_at: 0,
+  new_generated_at: 0,
+});
 
 const packageCount = ref<number | null>(null);
 const adaptedCount = ref<number | null>(null);
 const packageList = ref<Package[]>([]);
 
-const updating = ref(false);
-const progress = ref(0);
-const stage = ref("");
-
 const searchQuery = ref("");
 const currentTheme = ref<Theme>("monet");
 
-const STAGE_LABEL: Record<string, string> = {
-  fetch: t("update.fetch"),
-  download: t("update.download"),
-};
-
+/* ------------------------ constants ------------------------ */
 const sizeMap: Record<string, { col: number; row: number }> = {
   "1x1": { col: 1, row: 1 },
   "2x1": { col: 2, row: 1 },
@@ -50,6 +46,7 @@ const sizeMap: Record<string, { col: number; row: number }> = {
   "2x2": { col: 2, row: 2 },
 };
 
+/* ------------------------ concurrency ------------------------ */
 const MAX_CONCURRENT = 6;
 let running = 0;
 const queue: (() => void)[] = [];
@@ -58,12 +55,18 @@ const runTask = async (task: () => Promise<void>) => {
   if (running >= MAX_CONCURRENT) {
     await new Promise<void>((resolve) => queue.push(resolve));
   }
+
   running++;
-  await task();
-  running--;
-  queue.shift()?.();
+
+  try {
+    await task();
+  } finally {
+    running--;
+    queue.shift()?.();
+  }
 };
 
+/* ------------------------ icon state ------------------------ */
 interface IconState {
   monet: Record<string, boolean>;
   light: Record<string, boolean>;
@@ -74,6 +77,7 @@ interface IconState {
 
 const iconStatus = shallowRef<Record<string, IconState>>({});
 
+/* ------------------------ utils ------------------------ */
 const getBaseUrl = (app: Package) => `/uxicons/${app.packageName}/`;
 
 const getIconFileName = (size: string, type: string) => {
@@ -101,6 +105,7 @@ const getImgStyle = (sz: string) =>
     ? { height: "100%", width: "auto" }
     : { width: "100%", height: "auto" };
 
+/* ------------------------ icon check ------------------------ */
 const checkSet = async (base: string, sizes: string[], type: string) => {
   const result: Record<string, boolean> = {};
   await Promise.all(
@@ -129,10 +134,15 @@ const checkAppIcons = async (app: Package) => {
 
   const cacheKey = `icon-status:${pkg}`;
   const cached = localStorage.getItem(cacheKey);
+
   if (cached) {
-    iconStatus.value[pkg] = JSON.parse(cached);
-    iconStatus.value = { ...iconStatus.value };
-    return;
+    try {
+      iconStatus.value[pkg] = JSON.parse(cached);
+      iconStatus.value = { ...iconStatus.value };
+      return;
+    } catch {
+      localStorage.removeItem(cacheKey);
+    }
   }
 
   const base = getBaseUrl(app);
@@ -149,32 +159,45 @@ const checkAppIcons = async (app: Package) => {
 
   iconStatus.value[pkg] = result;
   iconStatus.value = { ...iconStatus.value };
+
   localStorage.setItem(cacheKey, JSON.stringify(result));
 };
 
 const observed = new Set<string>();
-let observer: IntersectionObserver;
+
+const observer = new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    if (!entry.isIntersecting) continue;
+
+    const pkg = (entry.target as HTMLElement).dataset.pkg!;
+    if (observed.has(pkg)) continue;
+
+    observed.add(pkg);
+
+    const app = packageList.value.find((a) => a.packageName === pkg);
+    if (app) runTask(() => checkAppIcons(app));
+  }
+});
 
 const observeItem = (el: Element | ComponentPublicInstance | null, app: Package) => {
   if (!el || !(el instanceof Element)) return;
+
   const pkg = app.packageName;
-  (el as HTMLElement).dataset.pkg = pkg;
+  const node = el as HTMLElement;
 
-  if (!observer) {
-    observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const pkg = (entry.target as HTMLElement).dataset.pkg!;
-        if (observed.has(pkg)) continue;
-        observed.add(pkg);
-        const app = packageList.value.find((a) => a.packageName === pkg);
-        if (app) runTask(() => checkAppIcons(app));
-      }
-    });
+  node.dataset.pkg = pkg;
+
+  if (!node.dataset.observed) {
+    observer.observe(node);
+    node.dataset.observed = "1";
   }
-
-  observer.observe(el);
 };
+
+onUnmounted(() => {
+  observer.disconnect();
+});
+
+const collator = new Intl.Collator("zh-Hans-u-co-pinyin");
 
 const filteredApps = computed(() => {
   const query = searchQuery.value.toLowerCase();
@@ -184,7 +207,7 @@ const filteredApps = computed(() => {
       (app) =>
         app.label?.toLowerCase().includes(query) || app.packageName.toLowerCase().includes(query),
     )
-    .sort((a, b) => (a.label || "").localeCompare(b.label || "", "zh-Hans-u-co-pinyin"));
+    .sort((a, b) => collator.compare(a.label || "", b.label || ""));
 });
 
 const hasAnyIcons = (pkg: string) => {
@@ -196,10 +219,20 @@ const hasAnyIcons = (pkg: string) => {
 const hasIconSize = (pkg: string, sz: string) =>
   iconStatus.value[pkg]?.[currentTheme.value]?.[sz] ?? false;
 
-const formatDate = (iso: number) => new Date(iso).toLocaleString();
-
 const handleThemeChange = (e: Event) => {
   currentTheme.value = (e.target as HTMLSelectElement).value as Theme;
+};
+
+const handleUpdateEvent = () => {
+  iconStatus.value = {};
+
+  Object.keys(localStorage)
+    .filter((k) => k.startsWith("icon-status:"))
+    .forEach((k) => localStorage.removeItem(k));
+
+  observed.clear();
+
+  getInfo();
 };
 
 const getInfo = async () => {
@@ -211,11 +244,7 @@ const getInfo = async () => {
 
     const res = await api.checkUpdate();
     if (res?.updated) {
-      update.value = {
-        updated: true,
-        old_version: formatDate(res.old_generated_at * 1000),
-        new_version: formatDate(res.new_generated_at * 1000),
-      };
+      update.value = res;
       showUpdateCard.value = true;
     }
   } catch (e) {
@@ -223,76 +252,7 @@ const getInfo = async () => {
   }
 };
 
-const handleUpdate = async () => {
-  updating.value = true;
-  progress.value = 0;
-  stage.value = t("update.preparing");
-
-  try {
-    await api.updateStream((msg) => {
-      if (msg.type === "stage") {
-        const s = msg.value as string;
-        stage.value = STAGE_LABEL[s] ?? s;
-      } else if (msg.type === "progress") {
-        const v = msg.value as number;
-        progress.value = Math.max(progress.value, Math.floor(v <= 1 ? v * 100 : v));
-      } else if (msg.type === "done") {
-        stage.value = t("update.done");
-        progress.value = 100;
-        setTimeout(() => (showUpdateCard.value = false), 2000);
-        getInfo();
-      } else if (msg.type === "error") {
-        stage.value = t("update.failed");
-      }
-    });
-  } catch (e) {
-    console.error(e);
-  } finally {
-    updating.value = false;
-  }
-};
-
 onMounted(getInfo);
-
-const onBeforeEnter = (el: Element) => {
-  const e = el as HTMLElement;
-  e.style.height = "0";
-  e.style.opacity = "0";
-  e.style.overflow = "hidden";
-};
-
-const onEnter = (el: Element) => {
-  const e = el as HTMLElement;
-  void e.offsetHeight;
-  e.style.height = `${el.scrollHeight}px`;
-  e.style.opacity = "1";
-};
-
-const onAfterEnter = (el: Element) => {
-  const e = el as HTMLElement;
-  e.style.height = "auto";
-  e.style.overflow = "";
-};
-
-const onBeforeLeave = (el: Element) => {
-  const e = el as HTMLElement;
-  e.style.height = `${el.scrollHeight}px`;
-  e.style.opacity = "1";
-  e.style.overflow = "hidden";
-};
-
-const onLeave = (el: Element) => {
-  const e = el as HTMLElement;
-  void e.offsetHeight;
-  e.style.height = "0";
-  e.style.opacity = "0";
-};
-
-const onAfterLeave = (el: Element) => {
-  const e = el as HTMLElement;
-  e.style.height = "";
-  e.style.opacity = "";
-};
 </script>
 
 <template>
@@ -311,46 +271,7 @@ const onAfterLeave = (el: Element) => {
       </div>
     </section>
 
-    <transition
-      @before-enter="onBeforeEnter"
-      @enter="onEnter"
-      @after-enter="onAfterEnter"
-      @before-leave="onBeforeLeave"
-      @leave="onLeave"
-      @after-leave="onAfterLeave"
-    >
-      <section v-if="showUpdateCard" class="update-card">
-        <h2 class="title">{{ t("update.found") }}</h2>
-
-        <div class="info">
-          <div class="row">
-            <span>{{ t("update.currentVersion") }}</span>
-            <span>{{ update?.old_version }}</span>
-          </div>
-          <div class="row highlight">
-            <span>{{ t("update.latestVersion") }}</span>
-            <span>{{ update?.new_version }}</span>
-          </div>
-        </div>
-
-        <div v-if="updating || stage === t('update.done')" class="progress">
-          <div class="stage">{{ stage }}</div>
-          <md-linear-progress :value="progress / 100" />
-          <div class="percent">{{ progress }}%</div>
-        </div>
-
-        <md-filled-button
-          v-if="!updating && stage !== t('update.done')"
-          class="update-btn"
-          @click="handleUpdate"
-        >
-          <md-icon slot="icon">
-            <svg viewBox="0 0 24 24"><path :d="ICONS.update" /></svg>
-          </md-icon>
-          {{ t("update.updateNow") }}
-        </md-filled-button>
-      </section>
-    </transition>
+    <update-card v-model:show="showUpdateCard" :data="update" @update="handleUpdateEvent" />
 
     <div class="toolbar">
       <div class="toolbar-inner">
@@ -446,7 +367,6 @@ const onAfterLeave = (el: Element) => {
   --gap: 12px;
 }
 
-/* stats */
 .stats {
   display: flex;
   gap: 8px;
@@ -468,63 +388,6 @@ const onAfterLeave = (el: Element) => {
   font-weight: 700;
 }
 
-/* update */
-.update-card {
-  margin-top: 8px;
-  padding: 20px;
-  border-radius: 16px;
-  background: var(--md-sys-color-secondary-container);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-
-  transition:
-    height 0.4s cubic-bezier(0.3, 0.8, 0.3, 1),
-    opacity 0.3s;
-}
-
-.update-card .title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-
-.update-card .info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.update-card .row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-  opacity: 0.85;
-}
-
-.update-card .highlight span:last-child {
-  color: var(--md-sys-color-primary);
-  font-weight: 600;
-}
-
-.update-card .update-btn {
-  width: 100%;
-  margin-top: 16px;
-}
-
-.progress {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.percent {
-  font-size: 11px;
-  text-align: right;
-  opacity: 0.5;
-}
-
-/* toolbar */
 .toolbar {
   position: sticky;
   top: 0;
