@@ -241,7 +241,7 @@ const getInfo = async () => {
     return;
   }
   update.value = checkRes.data;
-  showUpdateCard.value = true;
+  showUpdateCard.value = checkRes.data.updated;
 };
 
 onMounted(getInfo);
