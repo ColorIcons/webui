@@ -181,7 +181,7 @@ export function useAPI() {
       const infos = getPackagesInfo?.([...map.keys()]) ?? [];
 
       return infos.map((info) => ({
-        label: info.appLabel,
+        label: info.appLabel || info.packageName,
         packageName: info.packageName,
         isAdapted: map.get(info.packageName) ?? false,
       }));

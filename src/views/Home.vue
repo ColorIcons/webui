@@ -201,7 +201,14 @@ const filteredApps = computed(() => {
       (app) =>
         app.label?.toLowerCase().includes(query) || app.packageName.toLowerCase().includes(query),
     )
-    .sort((a, b) => collator.compare(a.label || "", b.label || ""));
+    .sort((a, b) => {
+      const aHas = hasAnyIcons(a.packageName);
+      const bHas = hasAnyIcons(b.packageName);
+
+      if (aHas !== bHas) return aHas ? -1 : 1;
+
+      return collator.compare(a.label || a.packageName, b.label || b.packageName);
+    });
 });
 
 const hasAnyIcons = (pkg: string) => {
