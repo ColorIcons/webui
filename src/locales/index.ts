@@ -19,7 +19,7 @@ export const messages = {
       iconStyle: "图标风格",
       iconStyleDesc: "选择你想启用的图标类型",
       concurrency: "并发数",
-      concurrencyDesc: "同时下载的文件数量，建议 4-8",
+      concurrencyDesc: "同时下载的文件数量，建议不要设置过大，以避免服务器返回 423 错误",
 
       iconThemes: {
         light: "浅色图标",
@@ -92,7 +92,8 @@ export const messages = {
       iconStyle: "Icon Style",
       iconStyleDesc: "Choose which icon styles to enable",
       concurrency: "Concurrency",
-      concurrencyDesc: "Simultaneously downloaded file count, recommended 4-8",
+      concurrencyDesc:
+        "Number of files to download concurrently. Avoid setting this too high to prevent server 423 errors.",
 
       iconThemes: {
         light: "Light Icons",

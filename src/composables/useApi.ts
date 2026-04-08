@@ -14,6 +14,22 @@ interface ExecResult {
   stderr: string;
 }
 
+interface Module {
+  moduleDir: string;
+  action: boolean;
+  author: string;
+  enabled: boolean;
+  name: string;
+  version: string;
+  description: string;
+  versionCode: string;
+  update: boolean;
+  web: boolean;
+  id: string;
+  mount: string;
+  remove: boolean;
+}
+
 interface PackagesInfo {
   packageName: string;
   versionName: string;
@@ -22,6 +38,23 @@ interface PackagesInfo {
   isSystem: boolean;
   uid: number;
 }
+
+type Result<T, E = string> = { ok: true; data: T } | { ok: false; error: E };
+
+const ok = <T>(data: T): Result<T> => ({ ok: true, data });
+
+const err = <E = string>(error: E): Result<never, E> => ({
+  ok: false,
+  error,
+});
+
+const wrap = async <T>(fn: () => Promise<T>): Promise<Result<T>> => {
+  try {
+    return ok(await fn());
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e));
+  }
+};
 
 type KsuExec = (cmd: string, options?: ExecOptions) => Promise<ExecResult>;
 
@@ -52,10 +85,12 @@ export type UpdateEvent =
   | { type: "exit" };
 
 type GetPackagesInfo = (packages: string[]) => PackagesInfo[];
+type ModuleInfo = () => string;
 
 let ksuExec: KsuExec | null = null;
 let ksuSpawn: KsuSpawn | null = null;
 let getPackagesInfo: GetPackagesInfo | null = null;
+let moduleInfo: ModuleInfo | null = null;
 let initPromise: Promise<void> | null = null;
 
 const initKernelSU = async () => {
@@ -63,38 +98,41 @@ const initKernelSU = async () => {
 
   if (!initPromise) {
     initPromise = (async () => {
-      if (import.meta.env.DEV) {
-        console.warn("[KernelSU] DEV MODE → using MOCK");
-
-        const mock = await import("../mocks/kernelsuMock");
-
-        ksuExec = mock.mockExec;
-        ksuSpawn = mock.mockSpawn;
-        getPackagesInfo = mock.mockGetPackagesInfo;
-        return;
-      }
-
       try {
-        const mod = (await import("kernelsu")) as any;
-        const api = mod.default ?? mod;
+        if (import.meta.env.DEV) {
+          console.warn("[KernelSU] DEV MODE → using MOCK");
+
+          const mock = await import("../mocks/kernelsuMock");
+
+          ksuExec = mock.mockExec;
+          ksuSpawn = mock.mockSpawn;
+          getPackagesInfo = mock.mockGetPackagesInfo;
+          return;
+        }
+
+        const mod = await import("kernelsu");
+        const api = (mod as any).default ?? mod;
 
         ksuExec = api.exec ?? null;
         ksuSpawn = api.spawn ?? null;
         getPackagesInfo = api.getPackagesInfo ?? null;
+        moduleInfo = api.moduleInfo ?? null;
 
-        console.log("[KernelSU] loaded:", {
-          exec: !!ksuExec,
-          spawn: !!ksuSpawn,
-        });
+        if (!ksuExec || !ksuSpawn) {
+          throw new Error("KernelSU API incomplete");
+        }
+
+        console.log("[KernelSU] loaded");
       } catch (e) {
-        console.error("[KernelSU] init failed ❌", e);
-        ksuExec = null;
-        ksuSpawn = null;
+        initPromise = null;
+
+        console.error("[KernelSU] init failed ", e);
+        throw e;
       }
     })();
   }
 
-  await initPromise;
+  return initPromise;
 };
 
 export function useAPI() {
@@ -110,83 +148,70 @@ export function useAPI() {
     throw new Error("KernelSU spawn not available");
   };
 
-  const execOrThrow = async (cmd: string) => {
-    const { errno, stdout, stderr } = await (await ensureExec())(cmd);
+  const execOrThrow = async (cmd: string, options?: ExecOptions) => {
+    const exec = await ensureExec();
+    const { errno, stdout, stderr } = await exec(cmd, options);
 
     if (errno !== 0) {
-      throw new Error(stderr?.trim() || `Command failed: ${cmd}`);
+      throw new Error(`[exec] failed (${errno}): ${cmd}\n${stderr?.trim() || "unknown error"}`);
     }
 
     return stdout.trim();
   };
 
-  const getAllPackages = async (): Promise<Package[]> => {
-    const stdout = await execOrThrow(`${PATHS.CIP_BIN} package list --json`);
+  // const safeJSON = <T>(input: string, fallback: T): T => {
+  //   try {
+  //     return JSON.parse(input);
+  //   } catch {
+  //     return fallback;
+  //   }
+  // };
 
-    const packages = JSON.parse(stdout) as {
-      package_name: string;
-      is_adapted: boolean;
-    }[];
+  const getAllPackages = async (): Promise<Result<Package[]>> => {
+    return wrap(async () => {
+      const stdout = await execOrThrow(`${PATHS.CIP_BIN} package list --json`);
 
-    const packagesMap = new Map<string, boolean>(
-      packages.map((item) => [item.package_name, item.is_adapted]),
-    );
+      const packages = JSON.parse(stdout) as {
+        package_name: string;
+        is_adapted: boolean;
+      }[];
 
-    const packageNames = [...packagesMap.keys()];
+      const map = new Map(packages.map((i) => [i.package_name, i.is_adapted]));
 
-    const packagesInfo = getPackagesInfo?.(packageNames) || [];
+      const infos = getPackagesInfo?.([...map.keys()]) ?? [];
 
-    const packageList: Package[] = packagesInfo.map((info) => ({
-      label: info.appLabel,
-      packageName: info.packageName,
-      isAdapted: packagesMap.get(info.packageName) ?? false,
-    }));
-
-    return packageList;
+      return infos.map((info) => ({
+        label: info.appLabel,
+        packageName: info.packageName,
+        isAdapted: map.get(info.packageName) ?? false,
+      }));
+    });
   };
 
-  const loadConfig = async (): Promise<Config> => {
-    const stdout = await execOrThrow(`${PATHS.CIP_BIN} config get --json`);
-    return JSON.parse(stdout);
+  const loadConfig = async (): Promise<Result<Config>> => {
+    return wrap(async () => {
+      const stdout = await execOrThrow(`${PATHS.CIP_BIN} config get --json`);
+      return JSON.parse(stdout);
+    });
   };
 
-  const getAdaptedCount = async (): Promise<number> => {
-    const stdout = await execOrThrow(
-      `find ${PATHS.TARGET_DIR} -mindepth 1 -maxdepth 1 -type d | wc -l`,
-    );
+  const checkUpdate = async (): Promise<Result<UpdateInfoRes>> => {
+    return wrap(async () => {
+      const spawn = await ensureSpawn();
+      const child = spawn(PATHS.CIP_BIN, ["check", "--json"]);
 
-    const num = parseInt(stdout, 10);
-    return Number.isNaN(num) ? 0 : num;
-  };
+      return await new Promise<UpdateInfoRes>((resolve, reject) => {
+        let buffer = "";
 
-  const getPackagesCount = async (): Promise<number> => {
-    const stdout = await execOrThrow(`pm list packages -3 | wc -l`);
+        child.stdout.on("data", (chunk) => (buffer += chunk));
 
-    const num = parseInt(stdout, 10);
-    return Number.isNaN(num) ? 0 : num;
-  };
-
-  const checkUpdate = async (): Promise<UpdateInfoRes> => {
-    const spawn = await ensureSpawn();
-    const child = spawn(PATHS.CIP_BIN, ["check", "--json"]);
-
-    return new Promise<UpdateInfoRes>((resolve, reject) => {
-      let buffer = "";
-
-      child.stdout.on("data", (chunk) => {
-        buffer += chunk;
-      });
-
-      child.on("exit", (code) => {
-        if (code !== 0) return reject(new Error(`exit code ${code}`));
-        try {
+        child.on("exit", (code) => {
+          if (code !== 0) return reject(new Error(`exit code ${code}`));
           resolve(JSON.parse(buffer));
-        } catch (e) {
-          reject(e);
-        }
-      });
+        });
 
-      child.stderr.on("data", (err) => console.error(err));
+        child.on("error", reject);
+      });
     });
   };
 
@@ -236,113 +261,98 @@ export function useAPI() {
 
       let buffer = "";
 
-      const handleParsed = (parsed: any) => {
-        onEvent(parsed);
-      };
+      const flushLines = () => {
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
-      const handleLine = (line: string) => {
-        const trimmed = line.trim();
-        if (!trimmed) return;
-
-        try {
-          handleParsed(JSON.parse(trimmed));
-        } catch {
-          onEvent({ type: "log", message: trimmed });
-        }
-      };
-
-      const tryParseJSON = (input: string): [any[], string] => {
-        const results: any[] = [];
-
-        while (input) {
-          input = input.trimStart();
-          if (!input) break;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
 
           try {
-            results.push(JSON.parse(input));
-            return [results, ""];
-          } catch {}
-
-          let splitIndex = -1;
-
-          for (let i = 1; i < input.length; i++) {
-            try {
-              JSON.parse(input.slice(0, i));
-              splitIndex = i;
-              break;
-            } catch {}
+            onEvent(JSON.parse(trimmed));
+          } catch {
+            onEvent({ type: "log", message: trimmed });
           }
-
-          if (splitIndex === -1) break;
-
-          results.push(JSON.parse(input.slice(0, splitIndex)));
-          input = input.slice(splitIndex);
         }
-
-        return [results, input];
       };
 
-      const handleStdout = (chunk: string) => {
+      child.stdout.on("data", (chunk) => {
         buffer += chunk;
+        flushLines();
+      });
 
-        if (buffer.includes("\n")) {
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          lines.forEach(handleLine);
-          return;
-        }
-
-        const [parsedList, rest] = tryParseJSON(buffer);
-        buffer = rest;
-
-        parsedList.forEach(handleParsed);
-      };
-
-      const handleStderr = (err: string) => {
+      child.stderr.on("data", (err) => {
         const msg = err.trim();
         if (!msg) return;
 
         onEvent({ type: "error", message: msg });
         onError?.(msg);
-      };
+      });
 
-      const handleExit = async (code: number) => {
+      child.on("exit", (code) => {
         if (code !== 0) {
           const msg = `exit code ${code}`;
           onEvent({ type: "error", message: msg });
           onError?.(msg);
-          reject(new Error(msg));
-          return;
+          return reject(new Error(msg));
         }
 
         onEvent({ type: "exit" });
-
         onDone?.();
         resolve();
-      };
+      });
 
-      const handleError = (err: any) => {
+      child.on("error", (err) => {
         const msg = String(err);
         onEvent({ type: "error", message: msg });
         onError?.(msg);
         reject(err);
-      };
-
-      child.stdout.on("data", handleStdout);
-      child.stderr.on("data", handleStderr);
-      child.on("exit", handleExit);
-      child.on("error", handleError);
+      });
     });
+  };
+
+  const getVersion = async () => {
+    await initKernelSU();
+    if (!moduleInfo) {
+      return {
+        version: "0.0.0",
+        name: "ColorOS Icons Patch",
+      };
+    }
+
+    try {
+      const res = JSON.parse(moduleInfo()) as Module;
+
+      return {
+        version: res.version ?? "0.0.0",
+        name: res.name ?? "Unknown",
+      };
+    } catch {
+      return {
+        version: "0.0.0",
+        name: "Parse Error",
+      };
+    }
+  };
+
+  const openLink = async (url: string): Promise<void> => {
+    const safeUrl = url.replace(/"/g, '\\"');
+
+    try {
+      await execOrThrow(`am start -a android.intent.action.VIEW -d "${safeUrl}"`);
+    } catch {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
   };
 
   return {
     loadConfig,
     checkUpdate,
-    getAdaptedCount,
-    getPackagesCount,
+    getVersion,
     getAllPackages,
     updateStream,
     setConfig,
+    openLink,
   };
 }

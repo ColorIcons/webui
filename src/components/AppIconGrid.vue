@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Package, Theme } from "../types/package";
+import "@material/web/ripple/ripple.js";
 
 interface Props {
   app: Package;

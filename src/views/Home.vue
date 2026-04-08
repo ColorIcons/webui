@@ -206,7 +206,6 @@ const filteredApps = computed(() => {
 
 const hasAnyIcons = (pkg: string) => {
   const s = iconStatus.value[pkg];
-  console.log(s);
   if (!s) return false;
   return Object.values(s[currentTheme.value] || {}).some(Boolean);
 };
@@ -227,20 +226,22 @@ const handleUpdateEvent = () => {
 };
 
 const getInfo = async () => {
-  try {
-    const all = await api.getAllPackages();
-    packageList.value = all;
-    packageCount.value = all.length;
-    adaptedCount.value = all.filter((i) => i.isAdapted).length;
-
-    const res = await api.checkUpdate();
-    if (res?.updated) {
-      update.value = res;
-      showUpdateCard.value = true;
-    }
-  } catch (e) {
-    console.error(e);
+  const packageRes = await api.getAllPackages();
+  if (!packageRes.ok) {
+    console.error(packageRes.error);
+    return;
   }
+  packageList.value = packageRes.data;
+  packageCount.value = packageRes.data.length;
+  adaptedCount.value = packageRes.data.filter((i) => i.isAdapted).length;
+
+  const checkRes = await api.checkUpdate();
+  if (!checkRes.ok) {
+    console.error(checkRes.error);
+    return;
+  }
+  update.value = checkRes.data;
+  showUpdateCard.value = true;
 };
 
 onMounted(getInfo);
@@ -262,13 +263,9 @@ onMounted(getInfo);
       </div>
     </section>
 
-    <update-card v-model:show="showUpdateCard" :data="update" @update="handleUpdateEvent" />
+    <UpdateCard v-model:show="showUpdateCard" :data="update" @update="handleUpdateEvent" />
 
-    <AppToolbar
-      v-model="searchQuery"
-      v-model:theme="currentTheme"
-      @update:theme="(v: Theme) => (currentTheme = v)"
-    />
+    <AppToolbar v-model="searchQuery" v-model:theme="currentTheme" />
 
     <main class="list">
       <div
@@ -328,7 +325,6 @@ onMounted(getInfo);
   font-size: 20px;
   font-weight: 700;
 }
-
 
 .list {
   display: flex;
