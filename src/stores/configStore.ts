@@ -29,8 +29,12 @@ const getConfig = async (force = false): Promise<Config> => {
 
   fetchPromise = api
     .loadConfig()
-    .then((remote) => {
-      const merged = mergeConfig(remote);
+    .then((res) => {
+      if (!res.ok) {
+        console.error(res.error);
+        return DEFAULT_CONFIG;
+      }
+      const merged = mergeConfig(res.data);
       config.value = merged;
       initialized.value = true;
       return merged;
