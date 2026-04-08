@@ -9,3 +9,5 @@ export interface Package {
   packageName: string;
   isAdapted: boolean;
 }
+
+export type Theme = "light" | "dark" | "material" | "monochrome";
